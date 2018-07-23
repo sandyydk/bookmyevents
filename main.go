@@ -1,31 +1,23 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/gorilla/mux"
+	"bookmyevents/config"
+	"bookmyevents/repository"
+	servicehandler "bookmyevents/servicehandlers/event"
+	"flag"
+	"log"
 )
 
-type eventServiceHandler struct{}
+func main() {
+	configPath := flag.String("config", `.\config\config.json`, "flag to set the path to the configuration json file")
+	flag.Parse()
 
-func ServeAPI(endpoint string) error {
-	handler := &eventServiceHandler{}
-	r := mux.NewRouter()
-	eventsrouter := r.PathPrefix("/events").Subrouter()
-	eventsrouter.Methods("GET").Path("/{SearchCriteria}/{Search}").HandlerFunc(handler.findEventHandler)
-	eventsrouter.Methods("GET").Path("").HandlerFunc(handler.allEventHandler)
-	eventsrouter.Methods("POST").Path("").HandlerFunc(handler.newEventHandler)
-	return http.ListenAndServe(endpoint, r)
-}
+	conf, _ := config.ExtractConfig(*configPath)
+	log.Println("Configuration parsed")
 
-func (eh *eventServiceHandler) findEventHandler(w http.ResponseWriter, r *http.Request) {
+	dbHandler, _ := repository.NewDBLayer(conf.Databasetype, conf.DBConnection)
 
-}
-
-func (eh *eventServiceHandler) allEventHandler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (eh *eventServiceHandler) newEventHandler(w http.ResponseWriter, r *http.Request) {
-
+	// Start REST API
+	log.Println("Starting EVents API Server")
+	log.Fatal(servicehandler.ServeAPI(conf.RestfulEndpoint, dbHandler))
 }
