@@ -23,14 +23,27 @@ func NewEventServiceHandler(databasehandler mongolayer.DatabaseHandler) *eventSe
 	}
 }
 
-func ServeAPI(endpoint string, dbHandler mongolayer.DatabaseHandler) error {
+// ServeAPI serves events APIs
+func ServeAPI(tlsendpoint, endpoint string, dbHandler mongolayer.DatabaseHandler) (chan error, chan error) {
 	handler := NewEventServiceHandler(dbHandler)
 	r := mux.NewRouter()
 	eventsrouter := r.PathPrefix("/events").Subrouter()
 	eventsrouter.Methods("GET").Path("/{SearchCriteria}/{Search}").HandlerFunc(handler.findEventHandler)
 	eventsrouter.Methods("GET").Path("").HandlerFunc(handler.allEventHandler)
 	eventsrouter.Methods("POST").Path("").HandlerFunc(handler.newEventHandler)
-	return http.ListenAndServe(endpoint, r)
+
+	httpErrorChan := make(chan error)
+	httpTLSErrorChan := make(chan error)
+
+	go func() {
+		httpErrorChan <- http.ListenAndServe(endpoint, r)
+	}()
+
+	go func() {
+		httpTLSErrorChan <- http.ListenAndServeTLS(tlsendpoint, "cert.pem", "key.pem", r)
+	}()
+
+	return httpErrorChan, httpTLSErrorChan
 }
 
 func (eh *eventServiceHandler) findEventHandler(w http.ResponseWriter, r *http.Request) {
