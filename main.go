@@ -18,6 +18,14 @@ func main() {
 	dbHandler, _ := repository.NewDBLayer(conf.Databasetype, conf.DBConnection)
 
 	// Start REST API
-	log.Println("Starting EVents API Server")
-	log.Fatal(servicehandler.ServeAPI(conf.RestfulEndpoint, dbHandler))
+	log.Println("Starting Events API Server")
+
+	httpErrorChan, httpTLSErrorChan := servicehandler.ServeAPI(conf.RestfulTLSEndpoint, conf.RestfulEndpoint, dbHandler)
+
+	select {
+	case err := <-httpErrorChan:
+		log.Fatal("HTTP Error found:", err)
+	case err := <-httpTLSErrorChan:
+		log.Fatal("HTTPS Error found:", err)
+	}
 }
