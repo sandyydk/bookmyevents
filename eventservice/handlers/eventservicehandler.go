@@ -2,6 +2,8 @@ package eventservicehandler
 
 import (
 	"bookmyevents/lib"
+	"bookmyevents/lib/events"
+	"bookmyevents/lib/msgqueue"
 	"bookmyevents/repository/dblayer/mongolayer"
 	"encoding/hex"
 	"encoding/json"
@@ -9,23 +11,26 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 )
 
 type eventServiceHandler struct {
-	dbhandler mongolayer.DatabaseHandler
+	dbhandler    mongolayer.DatabaseHandler
+	eventEmitter msgqueue.EventEmitter
 }
 
-func NewEventServiceHandler(databasehandler mongolayer.DatabaseHandler) *eventServiceHandler {
+func NewEventServiceHandler(databasehandler mongolayer.DatabaseHandler, eventEmitter msgqueue.EventEmitter) *eventServiceHandler {
 	return &eventServiceHandler{
-		dbhandler: databasehandler,
+		dbhandler:    databasehandler,
+		eventEmitter: eventEmitter,
 	}
 }
 
 // ServeAPI serves events APIs
-func ServeAPI(tlsendpoint, endpoint string, dbHandler mongolayer.DatabaseHandler) (chan error, chan error) {
-	handler := NewEventServiceHandler(dbHandler)
+func ServeAPI(tlsendpoint, endpoint string, dbHandler mongolayer.DatabaseHandler, eventEmitter msgqueue.EventEmitter) (chan error, chan error) {
+	handler := NewEventServiceHandler(dbHandler, eventEmitter)
 	r := mux.NewRouter()
 	eventsrouter := r.PathPrefix("/events").Subrouter()
 	eventsrouter.Methods("GET").Path("/{SearchCriteria}/{Search}").HandlerFunc(handler.findEventHandler)
@@ -113,6 +118,18 @@ func (eh *eventServiceHandler) newEventHandler(w http.ResponseWriter, r *http.Re
 		w.WriteHeader(500)
 		fmt.Fprintf(w, "{error: Error adding an event %d %s}", id, err)
 		return
+	}
+
+	msg := events.EventCreatedEvent{ID: hex.EncodeToString(id),
+		Name:       event.Name,
+		LocationID: event.Location.ID.Hex(),
+		Start:      time.Unix(event.StartDate, 0),
+		End:        time.Unix(event.EndDate, 0),
+	}
+
+	err = eh.eventEmitter.Emit(&msg)
+	if err != nil {
+		log.Println(fmt.Sprintf("Error emitting the event %s - %v", event.Name, err))
 	}
 
 }

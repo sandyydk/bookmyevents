@@ -2,10 +2,13 @@ package main
 
 import (
 	"bookmyevents/config"
+	servicehandler "bookmyevents/eventservice/handlers"
+	msgqueue "bookmyevents/lib/msgqueue/amqp"
 	"bookmyevents/repository"
-	servicehandler "bookmyevents/servicehandlers/event"
 	"flag"
 	"log"
+
+	"github.com/streadway/amqp"
 )
 
 func main() {
@@ -15,12 +18,24 @@ func main() {
 	conf, _ := config.ExtractConfig(*configPath)
 	log.Println("Configuration parsed")
 
+	conn, err := amqp.Dial(conf.AMQPMessageBroker)
+	if err != nil {
+		log.Println("Error dialing amqp -", err.Error())
+		panic(err)
+	}
+
+	emitter, err := msgqueue.NewAMQPEventEmitter(conn)
+	if err != nil {
+		log.Println("Error connecting to amqp -", err.Error())
+		panic(err)
+	}
+
 	dbHandler, _ := repository.NewDBLayer(conf.Databasetype, conf.DBConnection)
 
 	// Start REST API
 	log.Println("Starting Events API Server")
 
-	httpErrorChan, httpTLSErrorChan := servicehandler.ServeAPI(conf.RestfulTLSEndpoint, conf.RestfulEndpoint, dbHandler)
+	httpErrorChan, httpTLSErrorChan := servicehandler.ServeAPI(conf.RestfulTLSEndpoint, conf.RestfulEndpoint, dbHandler, emitter)
 
 	select {
 	case err := <-httpErrorChan:
