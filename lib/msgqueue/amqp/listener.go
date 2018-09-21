@@ -1,6 +1,7 @@
 package amqp
 
 import (
+	"bookmyevents/lib"
 	"bookmyevents/lib/events"
 	"bookmyevents/lib/msgqueue"
 	"encoding/json"
@@ -82,7 +83,7 @@ func (a *amqpEventListener) Listen(eventNames ...string) (<-chan msgqueue.Event,
 			var event msgqueue.Event
 
 			switch eventName {
-			case "event.created":
+			case lib.EVENTCREATED:
 				event = new(events.EventCreatedEvent)
 			default:
 				errorsChan <- fmt.Errorf("Event type %s is unknown", eventName)
@@ -101,5 +102,5 @@ func (a *amqpEventListener) Listen(eventNames ...string) (<-chan msgqueue.Event,
 
 	}()
 
-	return nil, nil, nil
+	return eventsChan, errorsChan, nil
 }

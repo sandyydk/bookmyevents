@@ -1,6 +1,7 @@
 package events
 
 import (
+	"bookmyevents/lib"
 	"time"
 )
 
@@ -14,5 +15,9 @@ type EventCreatedEvent struct {
 }
 
 func (e *EventCreatedEvent) EventName() string {
-	return "event.created"
+	return lib.EVENTCREATED
+}
+
+func (e *EventCreatedEvent) PartitionKey() string {
+	return e.ID
 }
